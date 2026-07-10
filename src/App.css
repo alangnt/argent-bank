@@ -141,6 +141,7 @@ body {
   border: 10px solid #00bc77;
   border-radius: 50%;
   padding: 1rem;
+  justify-self: center;
 }
 
 .feature-item {

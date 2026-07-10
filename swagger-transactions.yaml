@@ -1,0 +1,558 @@
+swagger: '2.0'
+info:
+  title: Argent Bank Transactions API
+  description: |
+    Proposed API contract for **Phase 2 — Transactions** of Argent Bank.
+
+    This document extends the existing Argent Bank API (which already covers
+    user signup, login and profile) with the endpoints required by the
+    transactions feature. Per the product brief, an authenticated user must be
+    able to:
+      * view all of their transactions for the current month, grouped by account;
+      * view the details of a single transaction in a dedicated view;
+      * add, edit or delete information on a transaction.
+
+    ### Design notes
+    * **Resource model.** A `Transaction` always belongs to an `Account`, so
+      transactions are exposed as a sub-resource of an account
+      (`/accounts/{accountId}/transactions`). This makes "grouped by account"
+      the natural shape of the data and keeps ownership checks simple.
+    * **Current month by default.** The list endpoint accepts an optional
+      `month` filter; when omitted it returns the current calendar month, which
+      is the default view in the mock-ups.
+    * **Editable fields.** In the mock-up, a transaction row is created by the
+      bank (date, amount, balance, type). The user typically only enriches it
+      with a `category` and free-text `notes`. `PATCH` is therefore used for
+      partial edits. `POST`/`DELETE` are included so the feature can support
+      manually adding and removing transactions as stated in the brief.
+    * **Envelope & auth.** Responses reuse the existing
+      `{ status, message, body }` envelope and the same Bearer (JWT) security
+      scheme as the rest of the Argent Bank API.
+  version: '1.0.0'
+  contact:
+    name: Argent Bank
+  license:
+    name: Proprietary
+host: localhost:3001
+basePath: /api/v1
+schemes:
+  - http
+consumes:
+  - application/json
+produces:
+  - application/json
+securityDefinitions:
+  Bearer:
+    type: apiKey
+    name: Authorization
+    in: header
+    description: >-
+      JWT obtained from `POST /user/login`, sent as `Authorization: Bearer <token>`.
+security:
+  - Bearer: []
+
+tags:
+  - name: Accounts
+    description: The bank accounts owned by the authenticated user.
+  - name: Transactions
+    description: Operations on the transactions of a given account.
+
+paths:
+  /accounts:
+    get:
+      tags:
+        - Accounts
+      summary: List the authenticated user's accounts
+      description: >-
+        Returns every account (checking, savings, credit card, …) that belongs
+        to the authenticated user, together with its current balance. Used to
+        render the account cards on the profile page and to group transactions
+        by account.
+      operationId: getAccounts
+      security:
+        - Bearer: []
+      responses:
+        '200':
+          description: Accounts successfully retrieved.
+          schema:
+            $ref: '#/definitions/AccountsResponse'
+        '401':
+          description: Missing or invalid JWT.
+          schema:
+            $ref: '#/definitions/ApiError'
+        '500':
+          description: Internal server error.
+          schema:
+            $ref: '#/definitions/ApiError'
+
+  /accounts/{accountId}:
+    get:
+      tags:
+        - Accounts
+      summary: Get a single account
+      description: Returns the details and current balance of one account owned by the user.
+      operationId: getAccountById
+      security:
+        - Bearer: []
+      parameters:
+        - $ref: '#/parameters/AccountId'
+      responses:
+        '200':
+          description: Account successfully retrieved.
+          schema:
+            $ref: '#/definitions/AccountResponse'
+        '401':
+          description: Missing or invalid JWT.
+          schema:
+            $ref: '#/definitions/ApiError'
+        '403':
+          description: The account does not belong to the authenticated user.
+          schema:
+            $ref: '#/definitions/ApiError'
+        '404':
+          description: No account matches the supplied accountId.
+          schema:
+            $ref: '#/definitions/ApiError'
+        '500':
+          description: Internal server error.
+          schema:
+            $ref: '#/definitions/ApiError'
+
+  /accounts/{accountId}/transactions:
+    get:
+      tags:
+        - Transactions
+      summary: List transactions of an account for a given month
+      description: >-
+        Returns the transactions of the given account for a single calendar
+        month. When the `month` parameter is omitted, the **current month** is
+        returned. Results are paginated and sorted by date (most recent first).
+      operationId: getAccountTransactions
+      security:
+        - Bearer: []
+      parameters:
+        - $ref: '#/parameters/AccountId'
+        - name: month
+          in: query
+          required: false
+          type: string
+          pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+          description: >-
+            Calendar month to return, formatted as `YYYY-MM`
+            (e.g. `2020-06`). Defaults to the current month.
+        - name: category
+          in: query
+          required: false
+          type: string
+          description: Optional filter restricting results to a single category.
+        - name: page
+          in: query
+          required: false
+          type: integer
+          minimum: 1
+          default: 1
+          description: 1-based page number for pagination.
+        - name: limit
+          in: query
+          required: false
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 25
+          description: Number of transactions per page.
+      responses:
+        '200':
+          description: Transactions successfully retrieved.
+          schema:
+            $ref: '#/definitions/TransactionsResponse'
+        '400':
+          description: Invalid query parameter (e.g. malformed `month`).
+          schema:
+            $ref: '#/definitions/ApiError'
+        '401':
+          description: Missing or invalid JWT.
+          schema:
+            $ref: '#/definitions/ApiError'
+        '403':
+          description: The account does not belong to the authenticated user.
+          schema:
+            $ref: '#/definitions/ApiError'
+        '404':
+          description: No account matches the supplied accountId.
+          schema:
+            $ref: '#/definitions/ApiError'
+        '500':
+          description: Internal server error.
+          schema:
+            $ref: '#/definitions/ApiError'
+    post:
+      tags:
+        - Transactions
+      summary: Add a transaction to an account
+      description: >-
+        Creates a new transaction on the given account. Server-managed fields
+        (`id`, `balance`, `createdAt`) are ignored if supplied and computed by
+        the API.
+      operationId: createTransaction
+      security:
+        - Bearer: []
+      parameters:
+        - $ref: '#/parameters/AccountId'
+        - name: body
+          in: body
+          required: true
+          description: Transaction to create.
+          schema:
+            $ref: '#/definitions/CreateTransactionPayload'
+      responses:
+        '201':
+          description: Transaction successfully created.
+          schema:
+            $ref: '#/definitions/TransactionResponse'
+        '400':
+          description: Validation error (missing or invalid fields).
+          schema:
+            $ref: '#/definitions/ApiError'
+        '401':
+          description: Missing or invalid JWT.
+          schema:
+            $ref: '#/definitions/ApiError'
+        '403':
+          description: The account does not belong to the authenticated user.
+          schema:
+            $ref: '#/definitions/ApiError'
+        '404':
+          description: No account matches the supplied accountId.
+          schema:
+            $ref: '#/definitions/ApiError'
+        '500':
+          description: Internal server error.
+          schema:
+            $ref: '#/definitions/ApiError'
+
+  /accounts/{accountId}/transactions/{transactionId}:
+    get:
+      tags:
+        - Transactions
+      summary: Get the details of a single transaction
+      description: >-
+        Returns the full details of one transaction, including the editable
+        `category` and `notes`. Powers the transaction-detail view.
+      operationId: getTransactionById
+      security:
+        - Bearer: []
+      parameters:
+        - $ref: '#/parameters/AccountId'
+        - $ref: '#/parameters/TransactionId'
+      responses:
+        '200':
+          description: Transaction successfully retrieved.
+          schema:
+            $ref: '#/definitions/TransactionResponse'
+        '401':
+          description: Missing or invalid JWT.
+          schema:
+            $ref: '#/definitions/ApiError'
+        '403':
+          description: The transaction/account does not belong to the authenticated user.
+          schema:
+            $ref: '#/definitions/ApiError'
+        '404':
+          description: No transaction matches the supplied identifiers.
+          schema:
+            $ref: '#/definitions/ApiError'
+        '500':
+          description: Internal server error.
+          schema:
+            $ref: '#/definitions/ApiError'
+    patch:
+      tags:
+        - Transactions
+      summary: Edit information on a transaction
+      description: >-
+        Partially updates a transaction. In practice the user edits the
+        `category` and/or `notes`; only the fields present in the request body
+        are changed. Bank-owned fields (amount, date, balance, type) are
+        immutable and rejected with `400` if supplied.
+      operationId: updateTransaction
+      security:
+        - Bearer: []
+      parameters:
+        - $ref: '#/parameters/AccountId'
+        - $ref: '#/parameters/TransactionId'
+        - name: body
+          in: body
+          required: true
+          description: Fields to update.
+          schema:
+            $ref: '#/definitions/UpdateTransactionPayload'
+      responses:
+        '200':
+          description: Transaction successfully updated.
+          schema:
+            $ref: '#/definitions/TransactionResponse'
+        '400':
+          description: Validation error or attempt to modify an immutable field.
+          schema:
+            $ref: '#/definitions/ApiError'
+        '401':
+          description: Missing or invalid JWT.
+          schema:
+            $ref: '#/definitions/ApiError'
+        '403':
+          description: The transaction/account does not belong to the authenticated user.
+          schema:
+            $ref: '#/definitions/ApiError'
+        '404':
+          description: No transaction matches the supplied identifiers.
+          schema:
+            $ref: '#/definitions/ApiError'
+        '500':
+          description: Internal server error.
+          schema:
+            $ref: '#/definitions/ApiError'
+    delete:
+      tags:
+        - Transactions
+      summary: Delete a transaction
+      description: >-
+        Permanently removes a transaction from the account. Returns no body on
+        success.
+      operationId: deleteTransaction
+      security:
+        - Bearer: []
+      parameters:
+        - $ref: '#/parameters/AccountId'
+        - $ref: '#/parameters/TransactionId'
+      responses:
+        '204':
+          description: Transaction successfully deleted (no content).
+        '401':
+          description: Missing or invalid JWT.
+          schema:
+            $ref: '#/definitions/ApiError'
+        '403':
+          description: The transaction/account does not belong to the authenticated user.
+          schema:
+            $ref: '#/definitions/ApiError'
+        '404':
+          description: No transaction matches the supplied identifiers.
+          schema:
+            $ref: '#/definitions/ApiError'
+        '500':
+          description: Internal server error.
+          schema:
+            $ref: '#/definitions/ApiError'
+
+parameters:
+  AccountId:
+    name: accountId
+    in: path
+    required: true
+    type: string
+    description: Unique identifier of the account.
+  TransactionId:
+    name: transactionId
+    in: path
+    required: true
+    type: string
+    description: Unique identifier of the transaction.
+
+definitions:
+  # ---- Core resources -------------------------------------------------------
+  Account:
+    type: object
+    properties:
+      id:
+        type: string
+        example: '5f0f2c9d4b9e8a0012a3b456'
+      title:
+        type: string
+        description: Human-readable account name.
+        example: Argent Bank Checking
+      accountNumber:
+        type: string
+        description: Masked account number as shown in the UI.
+        example: 'x8349'
+      type:
+        type: string
+        enum: [checking, savings, credit-card]
+        example: checking
+      balance:
+        type: number
+        format: double
+        description: Current available balance.
+        example: 2082.79
+      currency:
+        type: string
+        description: ISO 4217 currency code.
+        example: USD
+      updatedAt:
+        type: string
+        format: date-time
+
+  Transaction:
+    type: object
+    properties:
+      id:
+        type: string
+        example: '5f0f3a1e4b9e8a0012a3b789'
+      accountId:
+        type: string
+        example: '5f0f2c9d4b9e8a0012a3b456'
+      date:
+        type: string
+        format: date-time
+        example: '2020-06-20T14:31:00.000Z'
+      description:
+        type: string
+        example: Golden Sun Bakery
+      amount:
+        type: number
+        format: double
+        description: Signed amount; negative for a debit, positive for a credit.
+        example: -8.00
+      currency:
+        type: string
+        example: USD
+      balance:
+        type: number
+        format: double
+        description: Account balance immediately after this transaction.
+        example: 2082.79
+      transactionType:
+        type: string
+        enum: [electronic, transfer, cash, check, card]
+        example: electronic
+      category:
+        type: string
+        description: User-editable category.
+        example: Food
+      notes:
+        type: string
+        description: User-editable free-text note.
+        example: Lunch with the team
+
+  # ---- Request payloads -----------------------------------------------------
+  CreateTransactionPayload:
+    type: object
+    required:
+      - date
+      - description
+      - amount
+    properties:
+      date:
+        type: string
+        format: date-time
+        example: '2020-06-20T14:31:00.000Z'
+      description:
+        type: string
+        example: Golden Sun Bakery
+      amount:
+        type: number
+        format: double
+        example: -8.00
+      transactionType:
+        type: string
+        enum: [electronic, transfer, cash, check, card]
+        example: electronic
+      category:
+        type: string
+        example: Food
+      notes:
+        type: string
+        example: Lunch with the team
+
+  UpdateTransactionPayload:
+    type: object
+    minProperties: 1
+    description: >-
+      At least one editable field must be provided. Only `category` and `notes`
+      are user-editable.
+    properties:
+      category:
+        type: string
+        example: Food
+      notes:
+        type: string
+        example: Lunch with the team
+
+  # ---- Response envelopes ---------------------------------------------------
+  AccountsResponse:
+    type: object
+    properties:
+      status:
+        type: integer
+        example: 200
+      message:
+        type: string
+        example: Accounts retrieved successfully
+      body:
+        type: array
+        items:
+          $ref: '#/definitions/Account'
+
+  AccountResponse:
+    type: object
+    properties:
+      status:
+        type: integer
+        example: 200
+      message:
+        type: string
+        example: Account retrieved successfully
+      body:
+        $ref: '#/definitions/Account'
+
+  TransactionsResponse:
+    type: object
+    properties:
+      status:
+        type: integer
+        example: 200
+      message:
+        type: string
+        example: Transactions retrieved successfully
+      body:
+        type: object
+        properties:
+          month:
+            type: string
+            description: The month the results belong to (`YYYY-MM`).
+            example: '2020-06'
+          page:
+            type: integer
+            example: 1
+          limit:
+            type: integer
+            example: 25
+          total:
+            type: integer
+            description: Total number of transactions matching the query.
+            example: 42
+          transactions:
+            type: array
+            items:
+              $ref: '#/definitions/Transaction'
+
+  TransactionResponse:
+    type: object
+    properties:
+      status:
+        type: integer
+        example: 200
+      message:
+        type: string
+        example: Transaction retrieved successfully
+      body:
+        $ref: '#/definitions/Transaction'
+
+  ApiError:
+    type: object
+    properties:
+      status:
+        type: integer
+        example: 404
+      message:
+        type: string
+        example: Transaction not found
