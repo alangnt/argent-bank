@@ -15,16 +15,24 @@ info:
     ### Design notes
     * **Resource model.** A `Transaction` always belongs to an `Account`, so
       transactions are exposed as a sub-resource of an account
-      (`/accounts/{accountId}/transactions`). This makes "grouped by account"
-      the natural shape of the data and keeps ownership checks simple.
-    * **Current month by default.** The list endpoint accepts an optional
-      `month` filter; when omitted it returns the current calendar month, which
-      is the default view in the mock-ups.
-    * **Editable fields.** In the mock-up, a transaction row is created by the
-      bank (date, amount, balance, type). The user typically only enriches it
-      with a `category` and free-text `notes`. `PATCH` is therefore used for
-      partial edits. `POST`/`DELETE` are included so the feature can support
-      manually adding and removing transactions as stated in the brief.
+      (`/accounts/{accountId}/transactions`), which keeps ownership checks
+      simple.
+    * **Grouped by account in one call.** `GET /transactions` returns every
+      account of the user together with its transactions for the month, so the
+      "grouped by account" view needs a single request. The per-account list
+      remains available for the transactions page of a single account.
+    * **Current month by default.** Both list endpoints accept an optional
+      `month` filter; when omitted they return the current calendar month,
+      which is the default view in the mock-ups.
+    * **Transactions are bank records.** Transactions are created by the bank
+      and their core fields (date, description, amount, balance, type) are
+      immutable. The user can only add, edit or delete the *information* they
+      attach to a transaction: its `category` and free-text `notes`.
+      * add / edit → `PATCH /accounts/{accountId}/transactions/{transactionId}`
+      * delete → `DELETE /accounts/{accountId}/transactions/{transactionId}/{field}`
+
+      There is intentionally no endpoint to create or delete a whole
+      transaction.
     * **Envelope & auth.** Responses reuse the existing
       `{ status, message, body }` envelope and the same Bearer (JWT) security
       scheme as the rest of the Argent Bank API.
@@ -55,7 +63,7 @@ tags:
   - name: Accounts
     description: The bank accounts owned by the authenticated user.
   - name: Transactions
-    description: Operations on the transactions of a given account.
+    description: Operations on the transactions of the authenticated user.
 
 paths:
   /accounts:
@@ -66,8 +74,7 @@ paths:
       description: >-
         Returns every account (checking, savings, credit card, …) that belongs
         to the authenticated user, together with its current balance. Used to
-        render the account cards on the profile page and to group transactions
-        by account.
+        render the account cards on the profile page.
       operationId: getAccounts
       security:
         - Bearer: []
@@ -118,6 +125,41 @@ paths:
           schema:
             $ref: '#/definitions/ApiError'
 
+  /transactions:
+    get:
+      tags:
+        - Transactions
+      summary: List all transactions for a month, grouped by account
+      description: >-
+        Returns every account of the authenticated user, each with its
+        transactions for a single calendar month. When the `month` parameter is
+        omitted, the **current month** is returned. Within each account,
+        transactions are sorted by date (most recent first). Accounts without
+        transactions for the month are included with an empty list.
+      operationId: getTransactionsGroupedByAccount
+      security:
+        - Bearer: []
+      parameters:
+        - $ref: '#/parameters/Month'
+        - $ref: '#/parameters/Category'
+      responses:
+        '200':
+          description: Transactions successfully retrieved.
+          schema:
+            $ref: '#/definitions/GroupedTransactionsResponse'
+        '400':
+          description: Invalid query parameter (e.g. malformed `month`).
+          schema:
+            $ref: '#/definitions/ApiError'
+        '401':
+          description: Missing or invalid JWT.
+          schema:
+            $ref: '#/definitions/ApiError'
+        '500':
+          description: Internal server error.
+          schema:
+            $ref: '#/definitions/ApiError'
+
   /accounts/{accountId}/transactions:
     get:
       tags:
@@ -132,19 +174,8 @@ paths:
         - Bearer: []
       parameters:
         - $ref: '#/parameters/AccountId'
-        - name: month
-          in: query
-          required: false
-          type: string
-          pattern: '^\d{4}-(0[1-9]|1[0-2])$'
-          description: >-
-            Calendar month to return, formatted as `YYYY-MM`
-            (e.g. `2020-06`). Defaults to the current month.
-        - name: category
-          in: query
-          required: false
-          type: string
-          description: Optional filter restricting results to a single category.
+        - $ref: '#/parameters/Month'
+        - $ref: '#/parameters/Category'
         - name: page
           in: query
           required: false
@@ -167,50 +198,6 @@ paths:
             $ref: '#/definitions/TransactionsResponse'
         '400':
           description: Invalid query parameter (e.g. malformed `month`).
-          schema:
-            $ref: '#/definitions/ApiError'
-        '401':
-          description: Missing or invalid JWT.
-          schema:
-            $ref: '#/definitions/ApiError'
-        '403':
-          description: The account does not belong to the authenticated user.
-          schema:
-            $ref: '#/definitions/ApiError'
-        '404':
-          description: No account matches the supplied accountId.
-          schema:
-            $ref: '#/definitions/ApiError'
-        '500':
-          description: Internal server error.
-          schema:
-            $ref: '#/definitions/ApiError'
-    post:
-      tags:
-        - Transactions
-      summary: Add a transaction to an account
-      description: >-
-        Creates a new transaction on the given account. Server-managed fields
-        (`id`, `balance`, `createdAt`) are ignored if supplied and computed by
-        the API.
-      operationId: createTransaction
-      security:
-        - Bearer: []
-      parameters:
-        - $ref: '#/parameters/AccountId'
-        - name: body
-          in: body
-          required: true
-          description: Transaction to create.
-          schema:
-            $ref: '#/definitions/CreateTransactionPayload'
-      responses:
-        '201':
-          description: Transaction successfully created.
-          schema:
-            $ref: '#/definitions/TransactionResponse'
-        '400':
-          description: Validation error (missing or invalid fields).
           schema:
             $ref: '#/definitions/ApiError'
         '401':
@@ -268,13 +255,13 @@ paths:
     patch:
       tags:
         - Transactions
-      summary: Edit information on a transaction
+      summary: Add or edit information on a transaction
       description: >-
-        Partially updates a transaction. In practice the user edits the
-        `category` and/or `notes`; only the fields present in the request body
-        are changed. Bank-owned fields (amount, date, balance, type) are
-        immutable and rejected with `400` if supplied.
-      operationId: updateTransaction
+        Adds or edits the user-editable information of a transaction
+        (`category` and/or `notes`). Only the fields present in the request
+        body are changed. Any other field (amount, date, balance, type, …) is
+        rejected with `400`.
+      operationId: updateTransactionInfo
       security:
         - Bearer: []
       parameters:
@@ -283,7 +270,7 @@ paths:
         - name: body
           in: body
           required: true
-          description: Fields to update.
+          description: Fields to add or update.
           schema:
             $ref: '#/definitions/UpdateTransactionPayload'
       responses:
@@ -292,7 +279,9 @@ paths:
           schema:
             $ref: '#/definitions/TransactionResponse'
         '400':
-          description: Validation error or attempt to modify an immutable field.
+          description: >-
+            Validation error: empty body, invalid value, or attempt to modify a
+            non-editable field.
           schema:
             $ref: '#/definitions/ApiError'
         '401':
@@ -311,22 +300,36 @@ paths:
           description: Internal server error.
           schema:
             $ref: '#/definitions/ApiError'
+
+  /accounts/{accountId}/transactions/{transactionId}/{field}:
     delete:
       tags:
         - Transactions
-      summary: Delete a transaction
+      summary: Delete a piece of information from a transaction
       description: >-
-        Permanently removes a transaction from the account. Returns no body on
-        success.
-      operationId: deleteTransaction
+        Clears the user-editable `category` or `notes` of a transaction. The
+        transaction itself is kept. Returns the updated transaction.
+      operationId: deleteTransactionInfo
       security:
         - Bearer: []
       parameters:
         - $ref: '#/parameters/AccountId'
         - $ref: '#/parameters/TransactionId'
+        - name: field
+          in: path
+          required: true
+          type: string
+          enum: [category, notes]
+          description: The user-editable field to clear.
       responses:
-        '204':
-          description: Transaction successfully deleted (no content).
+        '200':
+          description: Information successfully deleted.
+          schema:
+            $ref: '#/definitions/TransactionResponse'
+        '400':
+          description: '`field` is not one of the user-editable fields.'
+          schema:
+            $ref: '#/definitions/ApiError'
         '401':
           description: Missing or invalid JWT.
           schema:
@@ -357,6 +360,21 @@ parameters:
     required: true
     type: string
     description: Unique identifier of the transaction.
+  Month:
+    name: month
+    in: query
+    required: false
+    type: string
+    pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+    description: >-
+      Calendar month to return, formatted as `YYYY-MM`
+      (e.g. `2020-06`). Defaults to the current month.
+  Category:
+    name: category
+    in: query
+    required: false
+    type: string
+    description: Optional filter restricting results to a single category.
 
 definitions:
   # ---- Core resources -------------------------------------------------------
@@ -426,55 +444,41 @@ definitions:
         example: electronic
       category:
         type: string
-        description: User-editable category.
+        description: User-editable category. Absent when not set.
         example: Food
       notes:
         type: string
-        description: User-editable free-text note.
+        description: User-editable free-text note. Absent when not set.
         example: Lunch with the team
+
+  AccountTransactions:
+    type: object
+    description: One account and its transactions for the requested month.
+    properties:
+      account:
+        $ref: '#/definitions/Account'
+      transactions:
+        type: array
+        items:
+          $ref: '#/definitions/Transaction'
 
   # ---- Request payloads -----------------------------------------------------
-  CreateTransactionPayload:
-    type: object
-    required:
-      - date
-      - description
-      - amount
-    properties:
-      date:
-        type: string
-        format: date-time
-        example: '2020-06-20T14:31:00.000Z'
-      description:
-        type: string
-        example: Golden Sun Bakery
-      amount:
-        type: number
-        format: double
-        example: -8.00
-      transactionType:
-        type: string
-        enum: [electronic, transfer, cash, check, card]
-        example: electronic
-      category:
-        type: string
-        example: Food
-      notes:
-        type: string
-        example: Lunch with the team
-
   UpdateTransactionPayload:
     type: object
     minProperties: 1
+    additionalProperties: false
     description: >-
       At least one editable field must be provided. Only `category` and `notes`
-      are user-editable.
+      are user-editable; any other property is rejected.
     properties:
       category:
         type: string
+        minLength: 1
         example: Food
       notes:
         type: string
+        minLength: 1
+        maxLength: 500
         example: Lunch with the team
 
   # ---- Response envelopes ---------------------------------------------------
@@ -503,6 +507,27 @@ definitions:
         example: Account retrieved successfully
       body:
         $ref: '#/definitions/Account'
+
+  GroupedTransactionsResponse:
+    type: object
+    properties:
+      status:
+        type: integer
+        example: 200
+      message:
+        type: string
+        example: Transactions retrieved successfully
+      body:
+        type: object
+        properties:
+          month:
+            type: string
+            description: The month the results belong to (`YYYY-MM`).
+            example: '2020-06'
+          accounts:
+            type: array
+            items:
+              $ref: '#/definitions/AccountTransactions'
 
   TransactionsResponse:
     type: object
