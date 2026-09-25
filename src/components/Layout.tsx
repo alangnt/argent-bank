@@ -23,7 +23,7 @@ function Layout() {
         <Link className="main-nav-logo" to="/">
           <img
             className="main-nav-logo-image"
-            src="./img/argentBankLogo.png"
+            src="/img/argentBankLogo.png"
             alt="Argent Bank Logo"
           />
           <h1 className="sr-only">Argent Bank</h1>
@@ -31,7 +31,7 @@ function Layout() {
         <div>
           {isAuthenticated ? (
             <>
-              <Link className="main-nav-item" to="/user">
+              <Link className="main-nav-item" to="/profile">
                 <i className="fa fa-user-circle"></i>
                 {user?.firstName ?? 'Account'}
               </Link>
@@ -45,7 +45,7 @@ function Layout() {
               </button>
             </>
           ) : (
-            <Link className="main-nav-item" to="/sign-in">
+            <Link className="main-nav-item" to="/login">
               <i className="fa fa-user-circle"></i>
               Sign In
             </Link>

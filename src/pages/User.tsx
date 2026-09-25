@@ -1,11 +1,15 @@
 import { useState } from 'react'
 import type { SubmitEvent } from 'react'
 import { useAppDispatch, useAppSelector } from '../store/hooks'
-import { selectUser, updateUserProfile } from '../features/auth/authSlice'
+import {
+  clearError,
+  selectAuth,
+  updateUserProfile
+} from '../features/auth/authSlice'
 
 function User() {
   const dispatch = useAppDispatch()
-  const user = useAppSelector(selectUser)
+  const { user, error } = useAppSelector(selectAuth)
 
   const [isEditing, setIsEditing] = useState(false)
   const [firstName, setFirstName] = useState('')
@@ -14,12 +18,18 @@ function User() {
   function startEditing() {
     setFirstName(user?.firstName ?? '')
     setLastName(user?.lastName ?? '')
+    dispatch(clearError())
     setIsEditing(true)
   }
 
   async function handleSave(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault()
-    const result = await dispatch(updateUserProfile({ firstName, lastName }))
+    const result = await dispatch(
+      updateUserProfile({
+        firstName: firstName.trim(),
+        lastName: lastName.trim()
+      })
+    )
     if (updateUserProfile.fulfilled.match(result)) {
       setIsEditing(false)
     }
@@ -34,6 +44,8 @@ function User() {
             <div className="input-wrapper">
               <input
                 aria-label="First name"
+                required
+                pattern=".*\S.*"
                 value={firstName}
                 onChange={event => setFirstName(event.target.value)}
               />
@@ -41,10 +53,17 @@ function User() {
             <div className="input-wrapper">
               <input
                 aria-label="Last name"
+                required
+                pattern=".*\S.*"
                 value={lastName}
                 onChange={event => setLastName(event.target.value)}
               />
             </div>
+            {error && (
+              <p className="edit-error" style={{ color: '#cc0000' }}>
+                {error}
+              </p>
+            )}
             <div className="edit-actions">
               <button type="submit" className="edit-button">
                 Save

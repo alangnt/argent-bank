@@ -16,7 +16,7 @@ function SignIn() {
   // Already signed in → skip the form.
   useEffect(() => {
     if (token) {
-      navigate('/user')
+      navigate('/profile')
     }
   }, [token, navigate])
 
@@ -31,7 +31,7 @@ function SignIn() {
     event.preventDefault()
     const result = await dispatch(loginUser({ email, password, rememberMe }))
     if (loginUser.fulfilled.match(result)) {
-      navigate('/user')
+      navigate('/profile')
     }
   }
 

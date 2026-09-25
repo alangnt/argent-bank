@@ -36,8 +36,8 @@ Clone and run the Argent Bank back-end in a separate folder (see its README for 
 ```bash
 # in the back-end project
 npm install
-npm run dev          # serves the API on http://localhost:3001
-npm run populate-db  # seeds the two demo users (run once)
+npm run dev:server   # serves the API on http://localhost:3001 (MongoDB must be running)
+npm run populate-db  # seeds the two demo users (run once, with the server running)
 ```
 
 Once seeded, you can sign in with the demo credentials the back end provides:
@@ -69,8 +69,20 @@ bun install   # install dependencies
 bun run dev   # start the dev server (Vite prints the local URL, e.g. http://localhost:5173)
 ```
 
-Open the printed URL in your browser. Signing in with a demo account above should take you to
-your profile page.
+Open the printed URL in your browser. Signing in with a demo account above (at `/login`) should
+take you to your profile page (`/profile`).
+
+### Troubleshooting the back end
+
+These are the usual culprits behind the setup issues reported on the upstream Bank-API repo:
+
+| Symptom | Fix |
+| --- | --- |
+| `npm run dev` does nothing / "missing script" | The script is `npm run dev:server`. |
+| `populate-db` fails with `ECONNREFUSED 127.0.0.1:3001` | The API server isn't running. Start it first, in another terminal. |
+| Server can't connect to MongoDB | Start MongoDB (e.g. `brew services start mongodb-community`). On recent Node versions, `localhost` may resolve to IPv6: set `DATABASE_URL=mongodb://127.0.0.1/argentBankDB` in the back end's `.env`. |
+| Install / runtime errors in the back end | It targets **Node 12** (mongoose 5, bcrypt 5). Use `nvm use 12` in the back-end folder. |
+| `401` when testing `/user/profile` in the API's Swagger UI | Enter `Bearer <token>` **without quotes** in the Authorization field. |
 
 ---
 
@@ -99,7 +111,7 @@ src/
 ├── components/
 │   ├── Layout.tsx      # nav (sign-in / user / sign-out) + footer
 │   └── ProtectedRoute.tsx  # gates /user behind authentication
-├── pages/              # Home, SignIn, User (profile)
+├── pages/              # Home (/), SignIn (/login), User (/profile)
 ├── store/              # Redux store + typed hooks
 └── App.tsx             # routes + session restore on refresh
 ```
@@ -113,8 +125,8 @@ src/
    `POST /user/profile`.
 2. **Session restore** — on refresh, a stored token triggers a profile fetch so you stay
    signed in; an invalid/expired token is cleared automatically.
-3. **Protected profile** — `/user` is only reachable when authenticated; otherwise you're
-   redirected to `/sign-in`.
+3. **Protected profile** — `/profile` is only reachable when authenticated; otherwise you're
+   redirected to `/login`.
 4. **Edit profile** — the profile page updates your first/last name via `PUT /user/profile`,
    persisting the change to the database.
 5. **Sign out** — clears the token and returns to the home page.

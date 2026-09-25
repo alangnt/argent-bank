@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/Layout.jsx'
 import ProtectedRoute from './components/ProtectedRoute'
 import Home from './pages/Home.jsx'
@@ -26,10 +26,14 @@ function App() {
     <Routes>
       <Route element={<Layout />}>
         <Route index element={<Home />} />
-        <Route path="sign-in" element={<SignIn />} />
+        <Route path="login" element={<SignIn />} />
         <Route element={<ProtectedRoute />}>
-          <Route path="user" element={<User />} />
+          <Route path="profile" element={<User />} />
         </Route>
+        {/* Legacy paths from the static mock-up */}
+        <Route path="sign-in" element={<Navigate to="/login" replace />} />
+        <Route path="user" element={<Navigate to="/profile" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
   )
