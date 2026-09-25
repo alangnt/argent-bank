@@ -13,12 +13,12 @@ The Phase 2 **Transactions API** is delivered as a design proposal, not code —
 
 You need **two things running**: this front end, and the Argent Bank **back-end API** it talks to.
 
-| Tool | Version | Notes |
-| --- | --- | --- |
-| [Bun](https://bun.sh) | ≥ 1.0 | Package manager & script runner used here (do **not** use npm) |
-| [Node.js](https://nodejs.org) | ≥ 20 | Required by Vite 8 |
-| Back-end API | — | The Argent Bank API, running on **`http://localhost:3001`** |
-| MongoDB | ≥ 4 | Required by the back-end API |
+| Tool                           | Version   | Notes                                                               |
+| ----------------------------   | -------   | ------------------------------------------------------------------- |
+| [Bun](https://bun.sh)          | ≥ 1.0     | Package manager & script runner used here (do**not** use npm)       |
+| [Node.js](https://nodejs.org)  | ≥ 20      | Required by Vite 8                                                  |
+| Back-end API                   | —         | The Argent Bank API, running on**`http://localhost:3001`**          |
+| MongoDB                        | ≥ 4       | Required by the back-end API                                        |
 
 > The back end is a **separate project** (the Argent Bank / Bank-API server provided by
 > OpenClassrooms). It exposes the `/user/*` endpoints this app consumes and must be running
@@ -43,7 +43,7 @@ npm run populate-db  # seeds the two demo users (run once, with the server runni
 Once seeded, you can sign in with the demo credentials the back end provides:
 
 | Email | Password |
-| --- | --- |
+| -------------------- | --------------- |
 | `tony@stark.com` | `password123` |
 | `steve@rogers.com` | `password456` |
 
@@ -76,24 +76,24 @@ take you to your profile page (`/profile`).
 
 These are the usual culprits behind the setup issues reported on the upstream Bank-API repo:
 
-| Symptom | Fix |
-| --- | --- |
-| `npm run dev` does nothing / "missing script" | The script is `npm run dev:server`. |
-| `populate-db` fails with `ECONNREFUSED 127.0.0.1:3001` | The API server isn't running. Start it first, in another terminal. |
-| Server can't connect to MongoDB | Start MongoDB (e.g. `brew services start mongodb-community`). On recent Node versions, `localhost` may resolve to IPv6: set `DATABASE_URL=mongodb://127.0.0.1/argentBankDB` in the back end's `.env`. |
-| Install / runtime errors in the back end | It targets **Node 12** (mongoose 5, bcrypt 5). Use `nvm use 12` in the back-end folder. |
-| `401` when testing `/user/profile` in the API's Swagger UI | Enter `Bearer <token>` **without quotes** in the Authorization field. |
+| Symptom                                                        | Fix                                                                                                                                                                                                          |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `npm run dev` does nothing / "missing script"                | The script is`npm run dev:server`.                                                                                                                                                                         |
+| `populate-db` fails with `ECONNREFUSED 127.0.0.1:3001`     | The API server isn't running. Start it first, in another terminal.                                                                                                                                           |
+| Server can't connect to MongoDB                                | Start MongoDB (e.g.`brew services start mongodb-community`). On recent Node versions, `localhost` may resolve to IPv6: set `DATABASE_URL=mongodb://127.0.0.1/argentBankDB` in the back end's `.env`. |
+| Install / runtime errors in the back end                       | It targets**Node 12** (mongoose 5, bcrypt 5). Use `nvm use 12` in the back-end folder.                                                                                                               |
+| `401` when testing `/user/profile` in the API's Swagger UI | Enter`Bearer <token>` **without quotes** in the Authorization field.                                                                                                                                 |
 
 ---
 
 ## Available scripts
 
-| Command | What it does |
-| --- | --- |
-| `bun run dev` | Start the Vite dev server with hot-module reload |
-| `bun run build` | Type-check (`tsc -b`) and build the production bundle into `dist/` |
-| `bun run preview` | Serve the built `dist/` locally to preview the production build |
-| `bun run lint` | Run ESLint over the project |
+| Command             | What it does                                                           |
+| ------------------- | ---------------------------------------------------------------------- |
+| `bun run dev`       | Start the Vite dev server with hot-module reload                       |
+| `bun run build`     | Type-check (`tsc -b`) and build the production bundle into `dist/`     |
+| `bun run preview`   | Serve the built`dist/` locally to preview the production build         |
+| `bun run lint`      | Run ESLint over the project                                            |
 
 ---
 
