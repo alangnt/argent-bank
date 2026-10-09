@@ -103,14 +103,14 @@ These are the usual culprits behind the setup issues reported on the upstream Ba
 src/
 ├── api/                # API client, typed endpoint wrappers, shared types
 │   ├── client.ts       # fetch wrapper: auth header + { status, message, body } envelope
-│   ├── user.ts         # signup / login / getProfile / updateProfile
+│   ├── user.ts         # login / getProfile / updateProfile
 │   └── types.ts        # request & response shapes
 ├── features/auth/      # Redux auth slice + JWT persistence
 │   ├── authSlice.ts    # login / fetchProfile / updateProfile thunks, logout, selectors
 │   └── tokenStorage.ts # remember-me: localStorage vs sessionStorage
 ├── components/
 │   ├── Layout.tsx      # nav (sign-in / user / sign-out) + footer
-│   └── ProtectedRoute.tsx  # gates /user behind authentication
+│   └── ProtectedRoute.tsx  # gates /profile behind authentication
 ├── pages/              # Home (/), SignIn (/login), User (/profile)
 ├── store/              # Redux store + typed hooks
 └── App.tsx             # routes + session restore on refresh
@@ -145,4 +145,4 @@ To view or validate it, paste the file into the [Swagger Editor](https://editor.
 
 ## Tech stack
 
-React 19 · TypeScript · Redux Toolkit · React Router · Vite 8 · Tailwind CSS
+React 19 · TypeScript · Redux Toolkit · React Router · Vite 8

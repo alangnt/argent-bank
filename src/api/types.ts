@@ -16,14 +16,10 @@ export interface User {
   updatedAt: string
 }
 
-export interface SignupPayload {
+export interface LoginPayload {
   email: string
   password: string
-  firstName: string
-  lastName: string
 }
-
-export type LoginPayload = Pick<SignupPayload, 'email' | 'password'>
 
 export interface AuthToken {
   token: string

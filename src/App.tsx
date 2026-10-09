@@ -1,10 +1,10 @@
 import { useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
-import Layout from './components/Layout.jsx'
+import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
-import Home from './pages/Home.jsx'
-import SignIn from './pages/SignIn.jsx'
-import User from './pages/User.jsx'
+import Home from './pages/Home'
+import SignIn from './pages/SignIn'
+import User from './pages/User'
 import { useAppDispatch, useAppSelector } from './store/hooks'
 import { fetchProfile, selectUser } from './features/auth/authSlice'
 import './App.css'
@@ -30,9 +30,6 @@ function App() {
         <Route element={<ProtectedRoute />}>
           <Route path="profile" element={<User />} />
         </Route>
-        {/* Legacy paths from the static mock-up */}
-        <Route path="sign-in" element={<Navigate to="/login" replace />} />
-        <Route path="user" element={<Navigate to="/profile" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

@@ -40,19 +40,19 @@ function User() {
       <div className="header">
         {isEditing ? (
           <form className="edit-form" onSubmit={handleSave}>
-            <h1>Edit user info</h1>
-            <div className="input-wrapper">
+            <h1>Welcome back</h1>
+            <div className="edit-fields">
               <input
                 aria-label="First name"
+                placeholder={user?.firstName}
                 required
                 pattern=".*\S.*"
                 value={firstName}
                 onChange={event => setFirstName(event.target.value)}
               />
-            </div>
-            <div className="input-wrapper">
               <input
                 aria-label="Last name"
+                placeholder={user?.lastName}
                 required
                 pattern=".*\S.*"
                 value={lastName}

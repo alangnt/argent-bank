@@ -15,15 +15,11 @@ info:
     ### Design notes
     * **Resource model.** A `Transaction` always belongs to an `Account`, so
       transactions are exposed as a sub-resource of an account
-      (`/accounts/{accountId}/transactions`), which keeps ownership checks
-      simple.
+      (`/accounts/{accountId}/transactions/{transactionId}`), which keeps
+      ownership checks simple.
     * **Grouped by account in one call.** `GET /transactions` returns every
-      account of the user together with its transactions for the month, so the
-      "grouped by account" view needs a single request. The per-account list
-      remains available for the transactions page of a single account.
-    * **Current month by default.** Both list endpoints accept an optional
-      `month` filter; when omitted they return the current calendar month,
-      which is the default view in the mock-ups.
+      account of the user together with its transactions for the current
+      month, so the "grouped by account" view needs a single request.
     * **Transactions are bank records.** Transactions are created by the bank
       and their core fields (date, description, amount, balance, type) are
       immutable. The user can only add, edit or delete the *information* they
@@ -37,10 +33,6 @@ info:
       `{ status, message, body }` envelope and the same Bearer (JWT) security
       scheme as the rest of the Argent Bank API.
   version: '1.0.0'
-  contact:
-    name: Argent Bank
-  license:
-    name: Proprietary
 host: localhost:3001
 basePath: /api/v1
 schemes:
@@ -60,156 +52,30 @@ security:
   - Bearer: []
 
 tags:
-  - name: Accounts
-    description: The bank accounts owned by the authenticated user.
   - name: Transactions
     description: Operations on the transactions of the authenticated user.
 
 paths:
-  /accounts:
-    get:
-      tags:
-        - Accounts
-      summary: List the authenticated user's accounts
-      description: >-
-        Returns every account (checking, savings, credit card, …) that belongs
-        to the authenticated user, together with its current balance. Used to
-        render the account cards on the profile page.
-      operationId: getAccounts
-      security:
-        - Bearer: []
-      responses:
-        '200':
-          description: Accounts successfully retrieved.
-          schema:
-            $ref: '#/definitions/AccountsResponse'
-        '401':
-          description: Missing or invalid JWT.
-          schema:
-            $ref: '#/definitions/ApiError'
-        '500':
-          description: Internal server error.
-          schema:
-            $ref: '#/definitions/ApiError'
-
-  /accounts/{accountId}:
-    get:
-      tags:
-        - Accounts
-      summary: Get a single account
-      description: Returns the details and current balance of one account owned by the user.
-      operationId: getAccountById
-      security:
-        - Bearer: []
-      parameters:
-        - $ref: '#/parameters/AccountId'
-      responses:
-        '200':
-          description: Account successfully retrieved.
-          schema:
-            $ref: '#/definitions/AccountResponse'
-        '401':
-          description: Missing or invalid JWT.
-          schema:
-            $ref: '#/definitions/ApiError'
-        '403':
-          description: The account does not belong to the authenticated user.
-          schema:
-            $ref: '#/definitions/ApiError'
-        '404':
-          description: No account matches the supplied accountId.
-          schema:
-            $ref: '#/definitions/ApiError'
-        '500':
-          description: Internal server error.
-          schema:
-            $ref: '#/definitions/ApiError'
-
   /transactions:
     get:
       tags:
         - Transactions
-      summary: List all transactions for a month, grouped by account
+      summary: List all transactions of the current month, grouped by account
       description: >-
         Returns every account of the authenticated user, each with its
-        transactions for a single calendar month. When the `month` parameter is
-        omitted, the **current month** is returned. Within each account,
+        transactions for the current calendar month. Within each account,
         transactions are sorted by date (most recent first). Accounts without
         transactions for the month are included with an empty list.
       operationId: getTransactionsGroupedByAccount
       security:
         - Bearer: []
-      parameters:
-        - $ref: '#/parameters/Month'
-        - $ref: '#/parameters/Category'
       responses:
         '200':
           description: Transactions successfully retrieved.
           schema:
             $ref: '#/definitions/GroupedTransactionsResponse'
-        '400':
-          description: Invalid query parameter (e.g. malformed `month`).
-          schema:
-            $ref: '#/definitions/ApiError'
         '401':
           description: Missing or invalid JWT.
-          schema:
-            $ref: '#/definitions/ApiError'
-        '500':
-          description: Internal server error.
-          schema:
-            $ref: '#/definitions/ApiError'
-
-  /accounts/{accountId}/transactions:
-    get:
-      tags:
-        - Transactions
-      summary: List transactions of an account for a given month
-      description: >-
-        Returns the transactions of the given account for a single calendar
-        month. When the `month` parameter is omitted, the **current month** is
-        returned. Results are paginated and sorted by date (most recent first).
-      operationId: getAccountTransactions
-      security:
-        - Bearer: []
-      parameters:
-        - $ref: '#/parameters/AccountId'
-        - $ref: '#/parameters/Month'
-        - $ref: '#/parameters/Category'
-        - name: page
-          in: query
-          required: false
-          type: integer
-          minimum: 1
-          default: 1
-          description: 1-based page number for pagination.
-        - name: limit
-          in: query
-          required: false
-          type: integer
-          minimum: 1
-          maximum: 100
-          default: 25
-          description: Number of transactions per page.
-      responses:
-        '200':
-          description: Transactions successfully retrieved.
-          schema:
-            $ref: '#/definitions/TransactionsResponse'
-        '400':
-          description: Invalid query parameter (e.g. malformed `month`).
-          schema:
-            $ref: '#/definitions/ApiError'
-        '401':
-          description: Missing or invalid JWT.
-          schema:
-            $ref: '#/definitions/ApiError'
-        '403':
-          description: The account does not belong to the authenticated user.
-          schema:
-            $ref: '#/definitions/ApiError'
-        '404':
-          description: No account matches the supplied accountId.
           schema:
             $ref: '#/definitions/ApiError'
         '500':
@@ -360,21 +226,6 @@ parameters:
     required: true
     type: string
     description: Unique identifier of the transaction.
-  Month:
-    name: month
-    in: query
-    required: false
-    type: string
-    pattern: '^\d{4}-(0[1-9]|1[0-2])$'
-    description: >-
-      Calendar month to return, formatted as `YYYY-MM`
-      (e.g. `2020-06`). Defaults to the current month.
-  Category:
-    name: category
-    in: query
-    required: false
-    type: string
-    description: Optional filter restricting results to a single category.
 
 definitions:
   # ---- Core resources -------------------------------------------------------
@@ -453,7 +304,7 @@ definitions:
 
   AccountTransactions:
     type: object
-    description: One account and its transactions for the requested month.
+    description: One account and its transactions for the current month.
     properties:
       account:
         $ref: '#/definitions/Account'
@@ -482,32 +333,6 @@ definitions:
         example: Lunch with the team
 
   # ---- Response envelopes ---------------------------------------------------
-  AccountsResponse:
-    type: object
-    properties:
-      status:
-        type: integer
-        example: 200
-      message:
-        type: string
-        example: Accounts retrieved successfully
-      body:
-        type: array
-        items:
-          $ref: '#/definitions/Account'
-
-  AccountResponse:
-    type: object
-    properties:
-      status:
-        type: integer
-        example: 200
-      message:
-        type: string
-        example: Account retrieved successfully
-      body:
-        $ref: '#/definitions/Account'
-
   GroupedTransactionsResponse:
     type: object
     properties:
@@ -528,37 +353,6 @@ definitions:
             type: array
             items:
               $ref: '#/definitions/AccountTransactions'
-
-  TransactionsResponse:
-    type: object
-    properties:
-      status:
-        type: integer
-        example: 200
-      message:
-        type: string
-        example: Transactions retrieved successfully
-      body:
-        type: object
-        properties:
-          month:
-            type: string
-            description: The month the results belong to (`YYYY-MM`).
-            example: '2020-06'
-          page:
-            type: integer
-            example: 1
-          limit:
-            type: integer
-            example: 25
-          total:
-            type: integer
-            description: Total number of transactions matching the query.
-            example: 42
-          transactions:
-            type: array
-            items:
-              $ref: '#/definitions/Transaction'
 
   TransactionResponse:
     type: object

@@ -1,4 +1,4 @@
-import { Link, Outlet, useNavigate } from 'react-router-dom'
+import { Link, Outlet } from 'react-router-dom'
 import { useAppDispatch, useAppSelector } from '../store/hooks'
 import {
   logout,
@@ -8,14 +8,8 @@ import {
 
 function Layout() {
   const dispatch = useAppDispatch()
-  const navigate = useNavigate()
   const isAuthenticated = useAppSelector(selectIsAuthenticated)
   const user = useAppSelector(selectUser)
-
-  function handleLogout() {
-    dispatch(logout())
-    navigate('/')
-  }
 
   return (
     <>
@@ -35,14 +29,14 @@ function Layout() {
                 <i className="fa fa-user-circle"></i>
                 {user?.firstName ?? 'Account'}
               </Link>
-              <button
-                type="button"
-                className="main-nav-item main-nav-button"
-                onClick={handleLogout}
+              <Link
+                className="main-nav-item"
+                to="/"
+                onClick={() => dispatch(logout())}
               >
                 <i className="fa fa-sign-out"></i>
                 Sign Out
-              </button>
+              </Link>
             </>
           ) : (
             <Link className="main-nav-item" to="/login">

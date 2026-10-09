@@ -2,15 +2,9 @@ import { request } from './client'
 import type {
   AuthToken,
   LoginPayload,
-  SignupPayload,
   UpdateProfilePayload,
   User
 } from './types'
-
-/** POST /user/signup — create an account. */
-export function signup(payload: SignupPayload): Promise<User> {
-  return request<User>('/user/signup', { method: 'POST', body: payload })
-}
 
 /** POST /user/login — exchange credentials for a JWT. */
 export function login(payload: LoginPayload): Promise<AuthToken> {

@@ -33,8 +33,8 @@ export const loginUser = createAsyncThunk<
 >('auth/login', async ({ email, password, rememberMe }, { rejectWithValue }) => {
   try {
     const { token } = await userApi.login({ email, password })
-    storeToken(token, rememberMe)
     const user = await userApi.getProfile(token)
+    storeToken(token, rememberMe)
     return { token, user }
   } catch (error) {
     return rejectWithValue(errorMessage(error))
