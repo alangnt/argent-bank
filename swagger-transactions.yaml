@@ -1,4 +1,4 @@
-swagger: '2.0'
+swagger: "2.0"
 info:
   title: Argent Bank Transactions API
   description: |
@@ -23,16 +23,19 @@ info:
     * **Transactions are bank records.** Transactions are created by the bank
       and their core fields (date, description, amount, balance, type) are
       immutable. The user can only add, edit or delete the *information* they
-      attach to a transaction: its `category` and free-text `notes`.
-      * add / edit → `PATCH /accounts/{accountId}/transactions/{transactionId}`
-      * delete → `DELETE /accounts/{accountId}/transactions/{transactionId}/{field}`
+      attach to a transaction: its `category` and free-text `notes`. All three
+      operations go through a single endpoint,
+      `PATCH /accounts/{accountId}/transactions/{transactionId}`, following
+      JSON Merge Patch semantics:
+      * add / edit → send the field with a value (`{ "notes": "Lunch" }`);
+      * delete → send the field with `null` (`{ "notes": null }`).
 
       There is intentionally no endpoint to create or delete a whole
       transaction.
     * **Envelope & auth.** Responses reuse the existing
       `{ status, message, body }` envelope and the same Bearer (JWT) security
       scheme as the rest of the Argent Bank API.
-  version: '1.0.0'
+  version: "1.0.0"
 host: localhost:3001
 basePath: /api/v1
 schemes:
@@ -70,18 +73,14 @@ paths:
       security:
         - Bearer: []
       responses:
-        '200':
+        "200":
           description: Transactions successfully retrieved.
           schema:
-            $ref: '#/definitions/GroupedTransactionsResponse'
-        '401':
-          description: Missing or invalid JWT.
-          schema:
-            $ref: '#/definitions/ApiError'
-        '500':
-          description: Internal server error.
-          schema:
-            $ref: '#/definitions/ApiError'
+            $ref: "#/definitions/GroupedTransactionsResponse"
+        "401":
+          $ref: "#/responses/Unauthorized"
+        "500":
+          $ref: "#/responses/InternalServerError"
 
   /accounts/{accountId}/transactions/{transactionId}:
     get:
@@ -95,123 +94,59 @@ paths:
       security:
         - Bearer: []
       parameters:
-        - $ref: '#/parameters/AccountId'
-        - $ref: '#/parameters/TransactionId'
+        - $ref: "#/parameters/AccountId"
+        - $ref: "#/parameters/TransactionId"
       responses:
-        '200':
+        "200":
           description: Transaction successfully retrieved.
           schema:
-            $ref: '#/definitions/TransactionResponse'
-        '401':
-          description: Missing or invalid JWT.
-          schema:
-            $ref: '#/definitions/ApiError'
-        '403':
-          description: The transaction/account does not belong to the authenticated user.
-          schema:
-            $ref: '#/definitions/ApiError'
-        '404':
-          description: No transaction matches the supplied identifiers.
-          schema:
-            $ref: '#/definitions/ApiError'
-        '500':
-          description: Internal server error.
-          schema:
-            $ref: '#/definitions/ApiError'
+            $ref: "#/definitions/TransactionResponse"
+        "401":
+          $ref: "#/responses/Unauthorized"
+        "403":
+          $ref: "#/responses/Forbidden"
+        "404":
+          $ref: "#/responses/NotFound"
+        "500":
+          $ref: "#/responses/InternalServerError"
     patch:
       tags:
         - Transactions
-      summary: Add or edit information on a transaction
+      summary: Add, edit or delete information on a transaction
       description: >-
-        Adds or edits the user-editable information of a transaction
+        Adds, edits or deletes the user-editable information of a transaction
         (`category` and/or `notes`). Only the fields present in the request
-        body are changed. Any other field (amount, date, balance, type, …) is
+        body are changed: a string value sets the field, `null` removes it
+        (the transaction itself is kept). Removing a field that is already
+        absent succeeds. Any other field (amount, date, balance, type, …) is
         rejected with `400`.
       operationId: updateTransactionInfo
       security:
         - Bearer: []
       parameters:
-        - $ref: '#/parameters/AccountId'
-        - $ref: '#/parameters/TransactionId'
+        - $ref: "#/parameters/AccountId"
+        - $ref: "#/parameters/TransactionId"
         - name: body
           in: body
           required: true
-          description: Fields to add or update.
+          description: Fields to add, update (string) or delete (`null`).
           schema:
-            $ref: '#/definitions/UpdateTransactionPayload'
+            $ref: "#/definitions/UpdateTransactionPayload"
       responses:
-        '200':
+        "200":
           description: Transaction successfully updated.
           schema:
-            $ref: '#/definitions/TransactionResponse'
-        '400':
-          description: >-
-            Validation error: empty body, invalid value, or attempt to modify a
-            non-editable field.
-          schema:
-            $ref: '#/definitions/ApiError'
-        '401':
-          description: Missing or invalid JWT.
-          schema:
-            $ref: '#/definitions/ApiError'
-        '403':
-          description: The transaction/account does not belong to the authenticated user.
-          schema:
-            $ref: '#/definitions/ApiError'
-        '404':
-          description: No transaction matches the supplied identifiers.
-          schema:
-            $ref: '#/definitions/ApiError'
-        '500':
-          description: Internal server error.
-          schema:
-            $ref: '#/definitions/ApiError'
-
-  /accounts/{accountId}/transactions/{transactionId}/{field}:
-    delete:
-      tags:
-        - Transactions
-      summary: Delete a piece of information from a transaction
-      description: >-
-        Clears the user-editable `category` or `notes` of a transaction. The
-        transaction itself is kept. Returns the updated transaction.
-      operationId: deleteTransactionInfo
-      security:
-        - Bearer: []
-      parameters:
-        - $ref: '#/parameters/AccountId'
-        - $ref: '#/parameters/TransactionId'
-        - name: field
-          in: path
-          required: true
-          type: string
-          enum: [category, notes]
-          description: The user-editable field to clear.
-      responses:
-        '200':
-          description: Information successfully deleted.
-          schema:
-            $ref: '#/definitions/TransactionResponse'
-        '400':
-          description: '`field` is not one of the user-editable fields.'
-          schema:
-            $ref: '#/definitions/ApiError'
-        '401':
-          description: Missing or invalid JWT.
-          schema:
-            $ref: '#/definitions/ApiError'
-        '403':
-          description: The transaction/account does not belong to the authenticated user.
-          schema:
-            $ref: '#/definitions/ApiError'
-        '404':
-          description: No transaction matches the supplied identifiers.
-          schema:
-            $ref: '#/definitions/ApiError'
-        '500':
-          description: Internal server error.
-          schema:
-            $ref: '#/definitions/ApiError'
+            $ref: "#/definitions/TransactionResponse"
+        "400":
+          $ref: "#/responses/BadRequest"
+        "401":
+          $ref: "#/responses/Unauthorized"
+        "403":
+          $ref: "#/responses/Forbidden"
+        "404":
+          $ref: "#/responses/NotFound"
+        "500":
+          $ref: "#/responses/InternalServerError"
 
 parameters:
   AccountId:
@@ -227,6 +162,50 @@ parameters:
     type: string
     description: Unique identifier of the transaction.
 
+responses:
+  BadRequest:
+    description: >-
+      Validation error: empty body, invalid value, or attempt to modify a
+      non-editable field.
+    schema:
+      $ref: "#/definitions/ApiError"
+    examples:
+      application/json:
+        status: 400
+        message: "Field 'amount' is not editable"
+  Unauthorized:
+    description: Missing or invalid JWT.
+    schema:
+      $ref: "#/definitions/ApiError"
+    examples:
+      application/json:
+        status: 401
+        message: Invalid or missing token
+  Forbidden:
+    description: The transaction/account does not belong to the authenticated user.
+    schema:
+      $ref: "#/definitions/ApiError"
+    examples:
+      application/json:
+        status: 403
+        message: Access to this resource is forbidden
+  NotFound:
+    description: No transaction matches the supplied identifiers.
+    schema:
+      $ref: "#/definitions/ApiError"
+    examples:
+      application/json:
+        status: 404
+        message: Transaction not found
+  InternalServerError:
+    description: Internal server error.
+    schema:
+      $ref: "#/definitions/ApiError"
+    examples:
+      application/json:
+        status: 500
+        message: Internal server error
+
 definitions:
   # ---- Core resources -------------------------------------------------------
   Account:
@@ -234,7 +213,7 @@ definitions:
     properties:
       id:
         type: string
-        example: '5f0f2c9d4b9e8a0012a3b456'
+        example: "5f0f2c9d4b9e8a0012a3b456"
       title:
         type: string
         description: Human-readable account name.
@@ -242,7 +221,7 @@ definitions:
       accountNumber:
         type: string
         description: Masked account number as shown in the UI.
-        example: 'x8349'
+        example: "x8349"
       type:
         type: string
         enum: [checking, savings, credit-card]
@@ -265,14 +244,14 @@ definitions:
     properties:
       id:
         type: string
-        example: '5f0f3a1e4b9e8a0012a3b789'
+        example: "5f0f3a1e4b9e8a0012a3b789"
       accountId:
         type: string
-        example: '5f0f2c9d4b9e8a0012a3b456'
+        example: "5f0f2c9d4b9e8a0012a3b456"
       date:
         type: string
         format: date-time
-        example: '2020-06-20T14:31:00.000Z'
+        example: "2020-06-20T14:31:00.000Z"
       description:
         type: string
         example: Golden Sun Bakery
@@ -307,11 +286,11 @@ definitions:
     description: One account and its transactions for the current month.
     properties:
       account:
-        $ref: '#/definitions/Account'
+        $ref: "#/definitions/Account"
       transactions:
         type: array
         items:
-          $ref: '#/definitions/Transaction'
+          $ref: "#/definitions/Transaction"
 
   # ---- Request payloads -----------------------------------------------------
   UpdateTransactionPayload:
@@ -320,16 +299,21 @@ definitions:
     additionalProperties: false
     description: >-
       At least one editable field must be provided. Only `category` and `notes`
-      are user-editable; any other property is rejected.
+      are user-editable; any other property is rejected. Set a field to a
+      string to add or edit it, or to `null` to delete it.
     properties:
       category:
         type: string
+        x-nullable: true
         minLength: 1
+        description: New category, or `null` to remove it.
         example: Food
       notes:
         type: string
+        x-nullable: true
         minLength: 1
         maxLength: 500
+        description: New note, or `null` to remove it.
         example: Lunch with the team
 
   # ---- Response envelopes ---------------------------------------------------
@@ -348,11 +332,11 @@ definitions:
           month:
             type: string
             description: The month the results belong to (`YYYY-MM`).
-            example: '2020-06'
+            example: "2020-06"
           accounts:
             type: array
             items:
-              $ref: '#/definitions/AccountTransactions'
+              $ref: "#/definitions/AccountTransactions"
 
   TransactionResponse:
     type: object
@@ -364,14 +348,14 @@ definitions:
         type: string
         example: Transaction retrieved successfully
       body:
-        $ref: '#/definitions/Transaction'
+        $ref: "#/definitions/Transaction"
 
   ApiError:
     type: object
     properties:
       status:
         type: integer
-        example: 404
+        description: HTTP status code of the error.
       message:
         type: string
-        example: Transaction not found
+        description: Human-readable error message.
